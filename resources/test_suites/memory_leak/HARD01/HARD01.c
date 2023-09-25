@@ -34,7 +34,7 @@ int main() {
 
   setC2A();
   freeC2B(); // Allocated memory for 'c2->b' is freed
-  free(c2);  // Allocated memory for 'c2' is freed
+  free(c2);  // Allocated memory for 'c2' is freed and lost access to 'c2->a'
 
-  return 0; // Return without freeing 'c2->a'
+  return 0;
 }

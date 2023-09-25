@@ -20,4 +20,5 @@ int main() {
   char *a = malloc(sizeof(char));
   a[0] = 'a';
   devn_pcx_write_rle(a, a + 4, 4);
+  free(a);
 }

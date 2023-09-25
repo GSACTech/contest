@@ -1082,7 +1082,7 @@
                             "uri": "test_suites/memory_leak/MEDIUM04/MEDIUM04.c"
                           },
                           "region": {
-                            "startLine": 34
+                            "startLine": 33
                           }
                         }
                       }
@@ -1097,7 +1097,7 @@
                             "uri": "test_suites/memory_leak/MEDIUM04/MEDIUM04.c"
                           },
                           "region": {
-                            "startLine": 39
+                            "startLine": 38
                           }
                         }
                       }
@@ -1119,7 +1119,7 @@
                   "uri": "test_suites/memory_leak/MEDIUM04/MEDIUM04.c"
                 },
                 "region": {
-                  "startLine": 39
+                  "startLine": 38
                 }
               }
             }
@@ -1215,7 +1215,7 @@
                             "uri": "test_suites/memory_leak/HARD01/HARD01.c"
                           },
                           "region": {
-                            "startLine": 39
+                            "startLine": 37
                           }
                         }
                       }
@@ -1237,7 +1237,7 @@
                   "uri": "test_suites/memory_leak/HARD01/HARD01.c"
                 },
                 "region": {
-                  "startLine": 39
+                  "startLine": 37
                 }
               }
             }
@@ -1274,7 +1274,7 @@
                             "uri": "test_suites/memory_leak/HARD02/HARD02.c"
                           },
                           "region": {
-                            "startLine": 18
+                            "startLine": 17
                           }
                         }
                       }
@@ -1296,7 +1296,7 @@
                   "uri": "test_suites/memory_leak/HARD02/HARD02.c"
                 },
                 "region": {
-                  "startLine": 18
+                  "startLine": 17
                 }
               }
             }
@@ -1613,7 +1613,7 @@
                             "uri": "test_suites/buffer_overflow/MEDIUM03/MEDIUM03.c"
                           },
                           "region": {
-                            "startLine": 55
+                            "startLine": 58
                           }
                         }
                       }

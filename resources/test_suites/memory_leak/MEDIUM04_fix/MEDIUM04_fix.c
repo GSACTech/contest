@@ -17,7 +17,6 @@ struct _virPCIVirtualFunctionList {
 
 typedef struct _virPCIVirtualFunctionList virPCIVirtualFunctionList;
 void virPCIVirtualFunctionListFree(virPCIVirtualFunctionList *list) {
-  size_t i;
 
   if (!list)
     return;

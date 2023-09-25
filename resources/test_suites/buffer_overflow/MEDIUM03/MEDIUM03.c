@@ -48,6 +48,9 @@ void foo(struct Info info) {
   time_table.minute = 10 * ((data[3] & 0xf0) >> 4) + (data[3] & 0x0f);
   // Access to 'data' is out of bounds
   time_table.second = 10 * ((data[4] & 0xf0) >> 4) + (data[4] & 0x0f); // buffer-overflow
+
+  printf("year: %d, month: %d, day: %d, hour: %d, minute: %d, second %d", time_table.year,
+         time_table.month, time_table.day, time_table.hour, time_table.minute, time_table.second);
 }
 
 int main() {

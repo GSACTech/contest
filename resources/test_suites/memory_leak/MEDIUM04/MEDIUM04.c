@@ -17,7 +17,6 @@ struct _virPCIVirtualFunctionList {
 
 typedef struct _virPCIVirtualFunctionList virPCIVirtualFunctionList;
 void virPCIVirtualFunctionListFree(virPCIVirtualFunctionList *list) {
-  size_t i;
 
   if (!list)
     return;
@@ -36,5 +35,5 @@ int main() {
   list->functions->addr = (int *)malloc(sizeof(int));
   virPCIVirtualFunctionListFree(list);
 
-  return 0; // Memory allocated by malloc for 'list->functions' is not released
+  return 0; // Allocated memory for 'list->functions' is not freed
 }

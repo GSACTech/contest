@@ -14,6 +14,6 @@ void freeSite() { free(c2->a); }
 int main() {
   allocSite();
   freeSite(); // Allocated memory for 'c2->a' is freed
-  free(c2);   // Allocated memory for 'c2' is freed
-  return 0;   // Return without freeing 'c2->b'
+  free(c2);   // Allocated memory for 'c2' is freed and lost access to 'c2->b'
+  return 0;
 }

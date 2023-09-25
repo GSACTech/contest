@@ -11,10 +11,10 @@ int main() {
   struct char2 *c2 = (struct char2 *)malloc(sizeof(struct char2));
   c2->a = (char *)malloc(sizeof(char));
   c2_alias = c2;
-  time_t seconds = time(NULL);
-  if (seconds >= 0)
+  time_t seconds = time(NULL) % 3;
+  if (seconds >= 0 && seconds <= 2)
     *(c2_alias->a) = 'a';
-  if (seconds < 0)
+  if (seconds >= 3)
     *(c2_alias->b) = 'b';
   free(c2->a);
   free(c2);
