@@ -41,6 +41,9 @@ class Report:
     def trace(self) -> list:
         return self.__trace
 
+    def source_name(self) -> str:
+        return self.__source_name
+
     @staticmethod
     def get_dict_by_source_name(reports: list) -> dict:
         reports_dict = {}
@@ -84,8 +87,9 @@ class Report:
 
 
 class ResultParser:
-    def __init__(self, res_path: str) -> None:
+    def __init__(self, res_path: str, prefix_in_report_name: str) -> None:
         self.__res_path = res_path
+        self.__prefix_in_report_name = prefix_in_report_name
 
         self.__parsing_done = False
         self.__reports = {}
@@ -100,7 +104,7 @@ class ResultParser:
 
         return self.__tool_name
 
-    def get_reports_by_report_type(self, report_type: str) -> list:
+    def get_reports_by_type(self, report_type: str) -> list:
         self.__parse_results()
         return self.__reports[report_type]
 
@@ -112,6 +116,10 @@ class ResultParser:
                 reports_list.append(report)
 
         return reports_list
+
+    def get_all_reports_dict(self) -> dict:
+        self.__parse_results()
+        return self.__reports
 
     def __parse_results(self) -> None:
         if self.__parsing_done:
@@ -144,7 +152,7 @@ class ResultParser:
                     self.__parse_single_result(file_real_p)
 
     def __parse_single_result(self, path_to: str) -> None:
-        if not path_to.endswith(".sarif"):
+        if not (path_to.endswith(".sarif") and path_to.startswith(self.__prefix_in_report_name)):
             return
 
         report = load_from_file(path_to)

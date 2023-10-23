@@ -1,6 +1,13 @@
+import pandas as pd
+import subprocess
+import datetime
+import hashlib
+import json
+import os
+
 from parsers.source_parser import SourceParser
 from parsers.source_parser import Function
-from parsers.result_parser import Report
+from parsers.result_parser import Report, ResultParser
 
 
 class Accuracy:
@@ -142,3 +149,247 @@ class Evaluator:
             return coefficient_dict[key_val]
 
         return 1
+
+
+class Sensitivities:
+    def __init__(self, context: bool, field: bool,
+                 flow: bool, path: bool) -> None:
+        self.__context = context
+        self.__field = field
+        self.__flow = flow
+        self.__path = path
+
+    def to_dict(self):
+        return {
+            "context": self.__context,
+            "field": self.__field,
+            "flow": self.__flow,
+            "path": self.__path
+        }
+
+
+class EvaluatorRunner:
+    EXP_REPORT_NAME = "expected_reports.sarif"
+    INNER_RES_NAME = "result_sarif_files"
+    BC_FILES_NAME = "bitcode_files"
+    SCORE_KEY = "score"
+    C_ENGINE = "podman"
+    PARTICIPANT_KEY = "participant"
+    SENSITIVITIES_KEY = "sensitivities"
+    RESOURCES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+    BC_GEN_SCRIPT = os.path.join(RESOURCES_DIR, "get_all_bitcode_files.sh")
+    RUNNER_NAME = "run_over_all_bc.sh"
+    C_WD = "/root"
+    RUNNER = os.path.join(RESOURCES_DIR, RUNNER_NAME)
+
+    def __init__(self, test_suites_dir: str) -> None:
+        self.__test_suites_dir = test_suites_dir
+
+        self.__all_results_dir = "result_dir_" + self.__get_time_str()
+        self.__scores = {}
+        self.__sensitivities = {}
+        self.__owner_to_results_dict = {}
+
+    @staticmethod
+    def __get_time_str() -> str:
+        now = datetime.datetime.now()
+        return now.strftime("%Y_%m_%d_%H_%M_%S")
+
+    def run_all(self, owner_to_url_dict: dict) -> None:
+        self.__save_results(owner_to_url_dict)
+        self.__evaluate_scores()
+        self.__evaluate_sensitivities()
+
+    def __save_results(self, owner_to_url_dict: dict) -> None:
+        bc_dir = os.path.join(self.__all_results_dir, self.BC_FILES_NAME)
+        os.makedirs(bc_dir)
+        self.__run("bash " + self.BC_GEN_SCRIPT + " " + self.__test_suites_dir + " " + bc_dir)
+
+        cont_image_list = []
+        for owner, url in owner_to_url_dict.items():
+            cloned_repo_name = os.path.splitext(os.path.basename(url))[0]
+            unique_name = self.__get_hash(url) + self.__get_time_str()
+            cont_image_list.append(unique_name)
+            try:
+                c_wd = unique_name + ":" + self.C_WD
+                self.__run("export GIT_TERMINAL_PROMPT=0")
+                self.__run(cmd="git clone " + url, cwd=self.__all_results_dir)
+                path_to_repo = os.path.join(self.__all_results_dir, cloned_repo_name)
+                self.__run(self.C_ENGINE + " build -t " + unique_name + " " + path_to_repo)
+                self.__run(self.C_ENGINE + " run --name " + unique_name + " -di " + unique_name)
+                self.__run(self.C_ENGINE + " cp " + self.RUNNER + " " + c_wd)
+                self.__run(self.C_ENGINE + " cp " + bc_dir + " " + c_wd)
+
+                runner_in_c = os.path.join(self.C_WD, self.RUNNER_NAME)
+                bc_dir_in_c = os.path.join(self.C_WD, self.BC_FILES_NAME)
+                res_in_c = os.path.join(self.C_WD, self.INNER_RES_NAME)
+
+                self.__run(self.C_ENGINE + " exec " + unique_name + " bash -c \'bash "
+                           + runner_in_c + " " + bc_dir_in_c + " " + res_in_c + "\'")
+                self.__run(
+                    self.C_ENGINE + " cp " + unique_name + ":" + res_in_c + " " + path_to_repo)
+
+                res_path = os.path.join(path_to_repo, self.INNER_RES_NAME)
+                self.__owner_to_results_dict[owner] = res_path
+            except subprocess.CalledProcessError:
+                print(f"error occurred when trying to get results of {owner}")
+
+        self.__clean_cont_images(cont_image_list)
+
+    @staticmethod
+    def __run(cmd: str, cwd: str = None) -> None:
+        subprocess.run(args=cmd, shell=True, check=True, cwd=cwd)
+
+    @staticmethod
+    def __clean_cont_images(cont_image_list: list) -> None:
+        for tmp_name in cont_image_list:
+            try:
+                EvaluatorRunner.__run(EvaluatorRunner.C_ENGINE + " rm -f " + tmp_name)
+                EvaluatorRunner.__run(EvaluatorRunner.C_ENGINE + " image rm -f " + tmp_name)
+            except subprocess.CalledProcessError:
+                pass
+
+    @staticmethod
+    def __get_hash(url: str) -> str:
+        h_obj = hashlib.sha256()
+        h_obj.update(url.encode("utf-8"))
+        return str(h_obj.hexdigest())[:16]
+
+    def __evaluate_scores(self) -> None:
+        subname = "testcases"
+        source_dir = os.path.join(self.__test_suites_dir, subname)
+        source_parser = SourceParser(source_dir)
+        src_functions = source_parser.functions()
+
+        exp_res_parser = ResultParser(
+            res_path=os.path.join(source_dir, self.EXP_REPORT_NAME),
+            prefix_in_report_name="")
+        exp_reports = exp_res_parser.get_all_reports()
+
+        for owner, res_dir in self.__owner_to_results_dict.items():
+            try:
+                received_res_parser = ResultParser(res_path=res_dir, prefix_in_report_name=subname)
+
+                received_reports = received_res_parser.get_all_reports()
+                evaluator = Evaluator(true_reports=exp_reports, received_reports=received_reports,
+                                      src_functions=src_functions)
+
+                self.__scores[owner] = evaluator.average_score()
+
+            except (ValueError, FileNotFoundError) as error:
+                print(type(error).__name__, ": ", error)
+
+    def __evaluate_sensitivities(self) -> None:
+        subname = "sensitivities"
+        source_dir = os.path.join(self.__test_suites_dir, subname)
+
+        exp_res_parser = ResultParser(
+            res_path=os.path.join(source_dir, self.EXP_REPORT_NAME),
+            prefix_in_report_name="")
+        exp_reports_dict = exp_res_parser.get_all_reports_dict()
+
+        for owner, res_dir in self.__owner_to_results_dict.items():
+            try:
+                received_res_parser = ResultParser(res_path=res_dir, prefix_in_report_name=subname)
+                received_reports_dict = received_res_parser.get_all_reports_dict()
+
+                for report_type, exp_reports in exp_reports_dict.items():
+                    rec_reports = []
+                    if report_type in received_reports_dict:
+                        rec_reports = received_reports_dict[report_type]
+
+                    self.__sensitivities[owner] = self.__get_sensitivities(
+                        exp_reports=self.__get_dict_by_name(exp_reports),
+                        rec_reports=self.__get_dict_by_name(rec_reports))
+
+            except (ValueError, FileNotFoundError) as error:
+                print(type(error).__name__, ": ", error)
+
+    @staticmethod
+    def __get_sensitivities(exp_reports: dict, rec_reports: dict) -> Sensitivities:
+        context_sensitive = False
+        field_sensitive = False
+        flow_sensitive = False
+        path_sensitive = False
+
+        for src_name, exp_report in exp_reports.items():
+            rec_report = []
+            if src_name in rec_reports:
+                rec_report = rec_reports[src_name]
+
+            tmp_sensitivity = EvaluatorRunner.__is_same_report_list(rec_report, exp_report)
+
+            if "ContextSensitive" in src_name:
+                context_sensitive = tmp_sensitivity
+            elif "FieldSensitive" in src_name:
+                field_sensitive = tmp_sensitivity
+            elif "FlowSensitive" in src_name:
+                flow_sensitive = tmp_sensitivity
+            elif "PathSensitive" in src_name:
+                path_sensitive = tmp_sensitivity
+
+        return Sensitivities(context=context_sensitive, field=field_sensitive,
+                             flow=flow_sensitive, path=path_sensitive)
+
+    @staticmethod
+    def __is_same_report_list(rep_list_1: list, rep_list_2: list) -> bool:
+        if len(rep_list_1) != len(rep_list_2):
+            return False
+
+        for report in rep_list_1:
+            if report not in rep_list_2:
+                return False
+
+        return True
+
+    @staticmethod
+    def __get_dict_by_name(reports_list: list) -> dict:
+        reports = {}
+        for report in reports_list:
+            src_name = report.source_name()
+            if src_name not in reports:
+                reports[src_name] = [report]
+            else:
+                reports[src_name].append(report)
+
+        return reports
+
+    def save(self) -> None:
+        filename = os.path.join(self.__all_results_dir, "ratings")
+        rates = self.__get_rates_list()
+        if rates:
+            self.__write_in_json(filename, rates)
+            self.__write_in_excel(filename, self.__get_dict_only_scores(rates))
+
+        print(f"All results are stored in {self.__all_results_dir}")
+
+    @staticmethod
+    def __get_dict_only_scores(rates: list) -> dict:
+        rates_dict = {}
+        for rate in rates:
+            rates_dict[rate[EvaluatorRunner.PARTICIPANT_KEY]] = rate[EvaluatorRunner.SCORE_KEY]
+
+        return rates_dict
+
+    def __get_rates_list(self) -> list:
+        rates = []
+        for owner, res_dir in self.__owner_to_results_dict.items():
+            score = self.__scores.get(owner)
+            sensitivities = (self.__sensitivities.get(owner)).to_dict()
+            tool = {self.PARTICIPANT_KEY: owner, self.SCORE_KEY: score,
+                    self.SENSITIVITIES_KEY: sensitivities}
+            rates.append(tool)
+
+        return rates
+
+    @staticmethod
+    def __write_in_excel(filename: str, rates: dict) -> None:
+        filename = filename + ".xlsx"
+        rates_df = pd.DataFrame(rates, index=["score"])
+        rates_df.to_excel(filename)
+
+    @staticmethod
+    def __write_in_json(filename: str, rates: list) -> None:
+        filename = filename + ".json"
+        with open(filename, "w") as file_json:
+            json.dump(rates, file_json, indent=4)

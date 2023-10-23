@@ -9,7 +9,7 @@ function check_args() {
 
 function check_and_get_bc() {
   SRC_DIR="$1"
-  PREFIX="$(echo "$TESTS_DIR" | sed "s/\//_/g")"
+  PREFIX="$(echo "$TESTS_DIR" | sed "s/\//_/g")_"
   UNIQUE_NAME="$(echo "$SRC_DIR" | sed "s/\//_/g")"
   MAIN_BC="$RESULT_DIR/${UNIQUE_NAME#$PREFIX}.bc"
 

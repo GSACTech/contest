@@ -5,7 +5,7 @@ This project automatically tests and compares all participants' static analysis 
 * To participate in this contest, users should develop a software analyzer using the
   provided [template](./example-analyzer)
 * They should accept the [assignment](https://classroom.github.com/a/S_09sdh2) and submit as a
-  github repository which will be visible only to admins
+  GitHub repository which will be visible only to admins
 
 ### To get all the requirements run the following script
 
@@ -16,20 +16,22 @@ sudo /path/to/contest/install_required_packages.sh
 ## Usage
 
 * To run this tool and get corresponding rates on our test suites
-  users must set the following environment variable as an argument
-    * TOOLS_LIST - path to a basic text file containing repository URLs of static analyzers
-
-* Use [run_evaluate.sh](/run_evaluate.sh) script for running tool.
-    * This script will iterate over all given repositories, run each tool on tests and check results
+  users must create a JSON formatted file, containing a list of URLs of static analyzers and their
+  owners and run the following python script
 
 ```shell
-export TOOLS_LIST="/path/to/tools_list.txt"
+python3 /path/to/evaluate.py --test-suites PATH_TO_TESTS --tools PATH_TO_JSON_FILE
 ```
-```shell
-bash /path/to/run_evaluate.sh
+* PATH_TO_TESTS shows the directory path containing test suites
+* PATH_TO_JSON_FILE is the path of JSON formatted file which must be in the following format
+```json
+{
+  "GitHub username of owner": "URL of GitHub repository to clone and test"
+}
 ```
 ## Results
+
 * A special result directory will be created after running `result_dir_%Y_%m_%d_%H_%M_%S`
-* In that directory you can find 
-  * all tools with their results `result_dir/analyzer_dir/result_sarif_files`
-  * the evaluated scores on test suite in JSON and XML formatted files
+* In that directory you can find
+    * all tools with their results `result_dir/analyzer_dir/result_sarif_files`
+    * the evaluated scores on test suites in JSON and Excel formatted files
