@@ -69,7 +69,7 @@ class Evaluator:
 
         self.__evaluated = False
         self.__accuracy = None
-        self.__average_score = -1
+        self.__weighted_score = -1
 
     def accuracy(self) -> Accuracy:
         self.__evaluate()
@@ -77,8 +77,8 @@ class Evaluator:
 
     def average_score(self) -> float:
         self.__evaluate()
-        self.__evaluate_average_score()
-        return self.__average_score
+        self.__evaluate_weighted_score()
+        return round(self.__weighted_score, 4)
 
     @staticmethod
     def get_intersection(first: list, second: list) -> list:
@@ -118,15 +118,15 @@ class Evaluator:
             if function not in self.__bad_functions:
                 SourceParser.add_in_list(function=function, src_functions=self.__good_functions)
 
-    def __evaluate_average_score(self) -> None:
-        if self.__average_score != -1:
+    def __evaluate_weighted_score(self) -> None:
+        if self.__weighted_score != -1:
             return
 
         src_to_true = Report.get_dict_by_source_name(self.__true_reports)
         src_to_received = Report.get_dict_by_source_name(self.__received_reports)
         src_to_bad = Function.get_dict_by_source_name(self.__bad_functions)
         src_to_good = Function.get_dict_by_source_name(self.__good_functions)
-        self.__average_score = 0
+        self.__weighted_score = 0
 
         for src_name, true_reports in src_to_true.items():
             received_reports = src_to_received[src_name] if src_name in src_to_received else []
@@ -138,11 +138,11 @@ class Evaluator:
                 Accuracy(true_reports_num=true_rep_num, received_reports_num=len(received_reports),
                          bad_functions_num=bad_func_num, good_functions_num=good_func_num))
 
-            tmp_score = tmp_accuracy.f1_score() * Evaluator.__get_coefficient(src_name)
-            self.__average_score += tmp_score
+            tmp_score = tmp_accuracy.f1_score() * Evaluator.__get_weight(src_name)
+            self.__weighted_score += tmp_score
 
     @staticmethod
-    def __get_coefficient(src_name: str) -> int:
+    def __get_weight(src_name: str) -> int:
         coefficient_dict = {"EASY": 1, "MEDIUM": 2, "HARD": 3}
         key_val = (src_name.split('_')[-1]).split('0')[0]
         if key_val in coefficient_dict:
@@ -158,6 +158,13 @@ class Sensitivities:
         self.__field = field
         self.__flow = flow
         self.__path = path
+
+    def update(self, other) -> None:
+        if isinstance(other, Sensitivities):
+            self.__context = self.__context and other.__context
+            self.__field = self.__field and other.__field
+            self.__flow = self.__flow and other.__flow
+            self.__path = self.__path and other.__path
 
     def to_dict(self):
         return {
@@ -298,9 +305,14 @@ class EvaluatorRunner:
                     if report_type in received_reports_dict:
                         rec_reports = received_reports_dict[report_type]
 
-                    self.__sensitivities[owner] = self.__get_sensitivities(
+                    tmp_sensitivities = self.__get_sensitivities(
                         exp_reports=self.__get_dict_by_name(exp_reports),
                         rec_reports=self.__get_dict_by_name(rec_reports))
+
+                    if owner in self.__sensitivities:
+                        self.__sensitivities[owner].update(tmp_sensitivities)
+                    else:
+                        self.__sensitivities[owner] = tmp_sensitivities
 
             except (ValueError, FileNotFoundError) as error:
                 print(type(error).__name__, ": ", error)

@@ -152,7 +152,7 @@ class ResultParser:
                     self.__parse_single_result(file_real_p)
 
     def __parse_single_result(self, path_to: str) -> None:
-        if not (path_to.endswith(".sarif") and path_to.startswith(self.__prefix_in_report_name)):
+        if not self.__is_corresponding_file(path_to):
             return
 
         report = load_from_file(path_to)
@@ -165,6 +165,10 @@ class ResultParser:
                                   locations=ResultParser.__get_locations(report.locations),
                                   trace=ResultParser.__get_trace(report.code_flows)),
                     reports=self.__reports[report.rule_id])
+
+    def __is_corresponding_file(self, file_path: str) -> bool:
+        filename = os.path.basename(file_path)
+        return filename.endswith(".sarif") and filename.startswith(self.__prefix_in_report_name)
 
     def __update_tool_name(self, new_name: str) -> None:
         if self.__tool_name != "" and self.__tool_name != new_name:
