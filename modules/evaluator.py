@@ -397,8 +397,11 @@ class EvaluatorRunner:
     @staticmethod
     def __write_in_excel(filename: str, rates: dict) -> None:
         filename = filename + ".xlsx"
-        rates_df = pd.DataFrame(rates, index=["score"])
-        rates_df.to_excel(filename)
+        names = list(rates.keys())
+        scores = list(rates.values())
+        data = {"name": names, "score": scores}
+        rates_df = pd.DataFrame(data)
+        rates_df.to_excel(filename, index=False)
 
     @staticmethod
     def __write_in_json(filename: str, rates: list) -> None:
