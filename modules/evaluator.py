@@ -366,11 +366,11 @@ class EvaluatorRunner:
 
         return reports
 
-    def save(self) -> None:
+    def save(self, save_sensitivities: bool) -> None:
         filename = os.path.join(self.__all_results_dir, "ratings")
         rates = self.__get_rates_list()
         if rates:
-            self.__write_in_json(filename, rates)
+            self.__write_in_json(filename, rates, save_sensitivities)
             self.__write_in_excel(filename, self.__get_dict_only_scores(rates))
 
         print(f"All results are stored in {self.__all_results_dir}")
@@ -403,8 +403,10 @@ class EvaluatorRunner:
         rates_df = pd.DataFrame(data)
         rates_df.to_excel(filename, index=False)
 
-    @staticmethod
-    def __write_in_json(filename: str, rates: list) -> None:
+    def __write_in_json(self, filename: str, rates: list, save_sensitivities) -> None:
+        if not save_sensitivities:
+            rates = self.__get_dict_only_scores(rates)
+
         filename = filename + ".json"
         with open(filename, "w") as file_json:
             json.dump(rates, file_json, indent=4)

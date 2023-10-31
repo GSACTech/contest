@@ -22,6 +22,9 @@ def parse_args(arg_list: list) -> argparse.Namespace:
     parser.add_argument("--tools", dest="tools",
                         help="JSON formatted file where all repository URLs are written",
                         required=True)
+    parser.add_argument("--save-sensitivities", dest="save_sensitivities", action="store_true",
+                        help="save also sensitivities information", default=False)
+
     args = parser.parse_args(arg_list)
     check_args(parser, args)
     return args
@@ -36,7 +39,7 @@ def main(arg_list: list):
     args = parse_args(arg_list)
     evaluator_runner = EvaluatorRunner(args.test_suites_dir)
     evaluator_runner.run_all(parse_tools_dict(args.tools))
-    evaluator_runner.save()
+    evaluator_runner.save(args.save_sensitivities)
 
 
 if __name__ == "__main__":
