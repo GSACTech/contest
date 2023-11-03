@@ -802,7 +802,7 @@
                             "uri": "test_suites/testcases/memory_leak/EASY02/EASY02.c"
                           },
                           "region": {
-                            "startLine": 13
+                            "startLine": 12
                           }
                         }
                       }
@@ -824,7 +824,7 @@
                   "uri": "test_suites/testcases/memory_leak/EASY02/EASY02.c"
                 },
                 "region": {
-                  "startLine": 13
+                  "startLine": 12
                 }
               }
             }
@@ -1097,7 +1097,7 @@
                             "uri": "test_suites/testcases/memory_leak/MEDIUM04/MEDIUM04.c"
                           },
                           "region": {
-                            "startLine": 38
+                            "startLine": 26
                           }
                         }
                       }
@@ -1119,7 +1119,7 @@
                   "uri": "test_suites/testcases/memory_leak/MEDIUM04/MEDIUM04.c"
                 },
                 "region": {
-                  "startLine": 38
+                  "startLine": 26
                 }
               }
             }

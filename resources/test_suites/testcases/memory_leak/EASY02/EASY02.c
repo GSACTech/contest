@@ -9,6 +9,6 @@ int main() {
   struct char2 *c2 = malloc(sizeof(struct char2));
   c2->a = (char *)malloc(sizeof(char)); // Memory allocation
   *c2->a = 'a';
-  free(c2);
-  return 0; // Return without freeing 'c2->a'
+  free(c2); // lost access to 'c2->a', so it can't be deallocated anymore
+  return 0;
 }

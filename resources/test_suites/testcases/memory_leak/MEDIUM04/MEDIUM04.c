@@ -23,7 +23,7 @@ void virPCIVirtualFunctionListFree(virPCIVirtualFunctionList *list) {
 
   free(list->functions->ifname);
   free(list->functions->addr);
-  free(list);
+  free(list); // lost access to 'list->functions' so it can't be deallocated anymore
 }
 
 int main() {
@@ -35,5 +35,5 @@ int main() {
   list->functions->addr = (int *)malloc(sizeof(int));
   virPCIVirtualFunctionListFree(list);
 
-  return 0; // Allocated memory for 'list->functions' is not freed
+  return 0;
 }
