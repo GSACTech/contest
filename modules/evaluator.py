@@ -154,10 +154,16 @@ class Evaluator:
 class Sensitivities:
     def __init__(self, context: bool, field: bool,
                  flow: bool, path: bool) -> None:
-        self.__context = context
-        self.__field = field
-        self.__flow = flow
-        self.__path = path
+        self.__context = self.__bool_to_str(context)
+        self.__field = self.__bool_to_str(field)
+        self.__flow = self.__bool_to_str(flow)
+        self.__path = self.__bool_to_str(path)
+
+    @staticmethod
+    def __bool_to_str(b: bool) -> str:
+        if b:
+            return "Yes"
+        return "No"
 
     def update(self, other) -> None:
         if isinstance(other, Sensitivities):
@@ -180,6 +186,10 @@ class EvaluatorRunner:
     INNER_RES_NAME = "result_sarif_files"
     BC_FILES_NAME = "bitcode_files"
     SCORE_KEY = "score"
+    CONTEXT_KEY = "context"
+    FIELD_KEY = "field"
+    FLOW_KEY = "flow"
+    PATH_KEY = "path"
     C_ENGINE = "podman"
     PARTICIPANT_KEY = "participant"
     SENSITIVITIES_KEY = "sensitivities"
@@ -371,7 +381,7 @@ class EvaluatorRunner:
         rates = self.__get_rates_list()
         if rates:
             self.__write_in_json(filename, rates, save_sensitivities)
-            self.__write_in_excel(filename, self.__get_dict_only_scores(rates))
+            self.__write_in_excel(filename, rates, save_sensitivities)
 
         print(f"All results are stored in {self.__all_results_dir}")
 
@@ -394,16 +404,43 @@ class EvaluatorRunner:
 
         return rates
 
-    @staticmethod
-    def __write_in_excel(filename: str, rates: dict) -> None:
+    def __write_in_excel(self, filename: str, rates: list, save_sensitivities: bool) -> None:
+        names = []
+        scores = []
+        context_sensitivities = []
+        field_sensitivities = []
+        flow_sensitivities = []
+        path_sensitivities = []
+
+        self.__fill_lists(names=names, scores=scores, context_sensitivities=context_sensitivities,
+                          field_sensitivities=field_sensitivities,
+                          flow_sensitivities=flow_sensitivities,
+                          path_sensitivities=path_sensitivities, rates=rates)
         filename = filename + ".xlsx"
-        names = list(rates.keys())
-        scores = list(rates.values())
-        data = {"name": names, "score": scores}
-        rates_df = pd.DataFrame(data)
+        data_to_save = {"participant": names, "score": scores}
+        if save_sensitivities:
+            data_to_save["context sensitivity"] = context_sensitivities
+            data_to_save["field sensitivity"] = field_sensitivities
+            data_to_save["flow sensitivity"] = flow_sensitivities
+            data_to_save["path sensitivity"] = path_sensitivities
+
+        rates_df = pd.DataFrame(data_to_save)
         rates_df.to_excel(filename, index=False)
 
-    def __write_in_json(self, filename: str, rates: list, save_sensitivities) -> None:
+    def __fill_lists(self, names: list, scores: list, context_sensitivities: list,
+                     field_sensitivities: list, flow_sensitivities: list,
+                     path_sensitivities: list, rates: list) -> None:
+        for rate in rates:
+            names.append(rate[self.PARTICIPANT_KEY])
+            scores.append((rate[self.SCORE_KEY]))
+
+            sensitivities = rate[self.SENSITIVITIES_KEY]
+            context_sensitivities.append(sensitivities[self.CONTEXT_KEY])
+            field_sensitivities.append(sensitivities[self.FIELD_KEY])
+            flow_sensitivities.append(sensitivities[self.FLOW_KEY])
+            path_sensitivities.append(sensitivities[self.PATH_KEY])
+
+    def __write_in_json(self, filename: str, rates: list, save_sensitivities: bool) -> None:
         if not save_sensitivities:
             rates = self.__get_dict_only_scores(rates)
 
