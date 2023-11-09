@@ -165,13 +165,6 @@ class Sensitivities:
             return "Yes"
         return "No"
 
-    def update(self, other) -> None:
-        if isinstance(other, Sensitivities):
-            self.__context = self.__context and other.__context
-            self.__field = self.__field and other.__field
-            self.__flow = self.__flow and other.__flow
-            self.__path = self.__path and other.__path
-
     def to_dict(self):
         return {
             "context": self.__context,
@@ -190,6 +183,9 @@ class EvaluatorRunner:
     FIELD_KEY = "field"
     FLOW_KEY = "flow"
     PATH_KEY = "path"
+    ML_KEY = "ML_KEY"
+    BOF_KEY = "BOF_KEY"
+    UAF_KEY = "UAF_KEY"
     C_ENGINE = "podman"
     PARTICIPANT_KEY = "participant"
     SENSITIVITIES_KEY = "sensitivities"
@@ -204,6 +200,9 @@ class EvaluatorRunner:
 
         self.__all_results_dir = "result_dir_" + self.__get_time_str()
         self.__scores = {}
+        self.__ml_nums = {}
+        self.__bof_nums = {}
+        self.__uaf_nums = {}
         self.__sensitivities = {}
         self.__owner_to_results_dict = {}
 
@@ -282,16 +281,33 @@ class EvaluatorRunner:
             res_path=os.path.join(source_dir, self.EXP_REPORT_NAME),
             prefix_in_report_name="")
         exp_reports = exp_res_parser.get_all_reports()
+        exp_reports_dict = exp_res_parser.get_all_reports_dict()
 
         for owner, res_dir in self.__owner_to_results_dict.items():
             try:
                 received_res_parser = ResultParser(res_path=res_dir, prefix_in_report_name=subname)
 
                 received_reports = received_res_parser.get_all_reports()
+                received_reports_dict = received_res_parser.get_all_reports_dict()
                 evaluator = Evaluator(true_reports=exp_reports, received_reports=received_reports,
                                       src_functions=src_functions)
 
                 self.__scores[owner] = evaluator.average_score()
+
+                for report_type, exp_reports in exp_reports_dict.items():
+                    rec_reports = []
+                    if report_type in received_reports_dict:
+                        rec_reports = received_reports_dict[report_type]
+
+                    true_reports_num = len(Evaluator.get_intersection(exp_reports, rec_reports))
+
+                    found_from_nums = str(true_reports_num) + "/" + str(len(exp_reports))
+                    if report_type == "memory-leak":
+                        self.__ml_nums[owner] = found_from_nums
+                    elif report_type == "buffer-overflow":
+                        self.__bof_nums[owner] = found_from_nums
+                    elif report_type == "use-after-free":
+                        self.__uaf_nums[owner] = found_from_nums
 
             except (ValueError, FileNotFoundError) as error:
                 print(type(error).__name__, ": ", error)
@@ -307,6 +323,7 @@ class EvaluatorRunner:
 
         for owner, res_dir in self.__owner_to_results_dict.items():
             try:
+                self.__sensitivities[owner] = {}
                 received_res_parser = ResultParser(res_path=res_dir, prefix_in_report_name=subname)
                 received_reports_dict = received_res_parser.get_all_reports_dict()
 
@@ -319,10 +336,7 @@ class EvaluatorRunner:
                         exp_reports=self.__get_dict_by_name(exp_reports),
                         rec_reports=self.__get_dict_by_name(rec_reports))
 
-                    if owner in self.__sensitivities:
-                        self.__sensitivities[owner].update(tmp_sensitivities)
-                    else:
-                        self.__sensitivities[owner] = tmp_sensitivities
+                    self.__sensitivities[owner][report_type] = tmp_sensitivities.to_dict()
 
             except (ValueError, FileNotFoundError) as error:
                 print(type(error).__name__, ": ", error)
@@ -397,9 +411,13 @@ class EvaluatorRunner:
         rates = []
         for owner, res_dir in self.__owner_to_results_dict.items():
             score = self.__scores.get(owner)
-            sensitivities = (self.__sensitivities.get(owner)).to_dict()
+            ml_num = self.__ml_nums.get(owner)
+            bof_num = self.__bof_nums.get(owner)
+            uaf_num = self.__uaf_nums.get(owner)
+            sensitivities = self.__sensitivities.get(owner)
             tool = {self.PARTICIPANT_KEY: owner, self.SCORE_KEY: score,
-                    self.SENSITIVITIES_KEY: sensitivities}
+                    self.SENSITIVITIES_KEY: sensitivities, self.ML_KEY: ml_num,
+                    self.BOF_KEY: bof_num, self.UAF_KEY: uaf_num}
             rates.append(tool)
 
         return rates
@@ -407,38 +425,56 @@ class EvaluatorRunner:
     def __write_in_excel(self, filename: str, rates: list, save_sensitivities: bool) -> None:
         names = []
         scores = []
+        ML_nums = []
+        BOF_nums = []
+        UAF_nums = []
         context_sensitivities = []
         field_sensitivities = []
         flow_sensitivities = []
         path_sensitivities = []
 
-        self.__fill_lists(names=names, scores=scores, context_sensitivities=context_sensitivities,
-                          field_sensitivities=field_sensitivities,
-                          flow_sensitivities=flow_sensitivities,
-                          path_sensitivities=path_sensitivities, rates=rates)
+        self.__fill_data(names=names, scores=scores, ML_nums=ML_nums, BOF_nums=BOF_nums,
+                         UAF_nums=UAF_nums, context_sensitivities=context_sensitivities,
+                         field_sensitivities=field_sensitivities,
+                         flow_sensitivities=flow_sensitivities,
+                         path_sensitivities=path_sensitivities, rates=rates)
         filename = filename + ".xlsx"
         data_to_save = {"participant": names, "score": scores}
         if save_sensitivities:
-            data_to_save["context sensitivity"] = context_sensitivities
-            data_to_save["field sensitivity"] = field_sensitivities
-            data_to_save["flow sensitivity"] = flow_sensitivities
-            data_to_save["path sensitivity"] = path_sensitivities
+            data_to_save["context sensitivity\n(ML/BOF/UAF)"] = context_sensitivities
+            data_to_save["field sensitivity\n(ML/BOF/UAF)"] = field_sensitivities
+            data_to_save["flow sensitivity\n(ML/BOF/UAF)"] = flow_sensitivities
+            data_to_save["path sensitivity\n(ML/BOF/UAF)"] = path_sensitivities
+            data_to_save["ML"] = ML_nums
+            data_to_save["BOF"] = BOF_nums
+            data_to_save["UAF"] = UAF_nums
 
         rates_df = pd.DataFrame(data_to_save)
         rates_df.to_excel(filename, index=False)
 
-    def __fill_lists(self, names: list, scores: list, context_sensitivities: list,
-                     field_sensitivities: list, flow_sensitivities: list,
-                     path_sensitivities: list, rates: list) -> None:
+    def __fill_data(self, names: list, scores: list, ML_nums: list, BOF_nums: list,
+                    UAF_nums: list, context_sensitivities: list,
+                    field_sensitivities: list, flow_sensitivities: list,
+                    path_sensitivities: list, rates: list) -> None:
         for rate in rates:
             names.append(rate[self.PARTICIPANT_KEY])
             scores.append((rate[self.SCORE_KEY]))
+            ML_nums.append(rate[self.ML_KEY])
+            BOF_nums.append(rate[self.BOF_KEY])
+            UAF_nums.append(rate[self.UAF_KEY])
 
             sensitivities = rate[self.SENSITIVITIES_KEY]
-            context_sensitivities.append(sensitivities[self.CONTEXT_KEY])
-            field_sensitivities.append(sensitivities[self.FIELD_KEY])
-            flow_sensitivities.append(sensitivities[self.FLOW_KEY])
-            path_sensitivities.append(sensitivities[self.PATH_KEY])
+            ML = sensitivities["memory-leak"]
+            BOF = sensitivities["buffer-overflow"]
+            UAF = sensitivities["use-after-free"]
+            context_sensitivities.append(
+                ML[self.CONTEXT_KEY] + "/" + BOF[self.CONTEXT_KEY] + "/" + UAF[self.CONTEXT_KEY])
+            field_sensitivities.append(
+                ML[self.FIELD_KEY] + "/" + BOF[self.FIELD_KEY] + "/" + UAF[self.FIELD_KEY])
+            flow_sensitivities.append(
+                ML[self.FLOW_KEY] + "/" + BOF[self.FLOW_KEY] + "/" + UAF[self.FLOW_KEY])
+            path_sensitivities.append(
+                ML[self.PATH_KEY] + "/" + BOF[self.PATH_KEY] + "/" + UAF[self.PATH_KEY])
 
     def __write_in_json(self, filename: str, rates: list, save_sensitivities: bool) -> None:
         if not save_sensitivities:
