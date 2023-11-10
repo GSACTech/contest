@@ -294,23 +294,28 @@ class EvaluatorRunner:
 
                 self.__scores[owner] = evaluator.average_score()
 
-                for report_type, exp_reports in exp_reports_dict.items():
-                    rec_reports = []
-                    if report_type in received_reports_dict:
-                        rec_reports = received_reports_dict[report_type]
-
-                    true_reports_num = len(Evaluator.get_intersection(exp_reports, rec_reports))
-
-                    found_from_nums = str(true_reports_num) + "/" + str(len(exp_reports))
-                    if report_type == "memory-leak":
-                        self.__ml_nums[owner] = found_from_nums
-                    elif report_type == "buffer-overflow":
-                        self.__bof_nums[owner] = found_from_nums
-                    elif report_type == "use-after-free":
-                        self.__uaf_nums[owner] = found_from_nums
+                self.__fill_found_from_nums(exp_reports_dict=exp_reports_dict,
+                                            rec_reports_dict=received_reports_dict, owner=owner)
 
             except (ValueError, FileNotFoundError) as error:
                 print(type(error).__name__, ": ", error)
+
+    def __fill_found_from_nums(self, exp_reports_dict: dict, rec_reports_dict: dict,
+                               owner: str) -> None:
+        for report_type, exp_reports in exp_reports_dict.items():
+            rec_reports = []
+            if report_type in rec_reports_dict:
+                rec_reports = rec_reports_dict[report_type]
+
+            true_reports_num = len(Evaluator.get_intersection(exp_reports, rec_reports))
+
+            found_from_nums = str(true_reports_num) + "/" + str(len(exp_reports))
+            if report_type == "memory-leak":
+                self.__ml_nums[owner] = found_from_nums
+            elif report_type == "buffer-overflow":
+                self.__bof_nums[owner] = found_from_nums
+            elif report_type == "use-after-free":
+                self.__uaf_nums[owner] = found_from_nums
 
     def __evaluate_sensitivities(self) -> None:
         subname = "sensitivities"
