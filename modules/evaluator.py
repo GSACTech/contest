@@ -425,7 +425,12 @@ class EvaluatorRunner:
                     self.BOF_KEY: bof_num, self.UAF_KEY: uaf_num}
             rates.append(tool)
 
+        rates = sorted(rates, key=self.__cmp_rates, reverse=True)
         return rates
+
+    @staticmethod
+    def __cmp_rates(el):
+        return el[EvaluatorRunner.SCORE_KEY]
 
     def __write_in_excel(self, filename: str, rates: list, save_sensitivities: bool) -> None:
         names = []
